@@ -1,0 +1,285 @@
+
+--Q1 List all the states in which we have customers who have bought cellphones from 2005 till today. 
+
+SELECT DISTINCT 
+    y.State 
+FROM 
+    FACT_TRANSACTIONS AS X
+INNER JOIN 
+    DIM_LOCATION AS Y ON x.IDLocation = y.IDLocation
+WHERE 
+    YEAR(date) >= 2005;
+
+--Q1 End
+
+--Q2 What state in the US is buying the most 'Samsung' cell phones? 
+
+SELECT TOP 1 
+    w.State, 
+    z.Manufacturer_Name, 
+    SUM(quantity) AS Total_Quantity 
+FROM 
+    FACT_TRANSACTIONS AS X
+INNER JOIN 
+    DIM_MODEL AS Y ON x.IDModel = y.IDModel
+INNER JOIN 
+    DIM_MANUFACTURER AS Z ON y.IDManufacturer = z.IDManufacturer
+INNER JOIN 
+    DIM_LOCATION AS W ON w.IDLocation = x.IDLocation
+WHERE 
+    z.Manufacturer_Name = 'Samsung' 
+    AND w.Country = 'US'
+GROUP BY 
+    z.Manufacturer_Name, 
+    w.State
+ORDER BY 
+    Total_Quantity DESC;
+
+
+--Q2 End
+
+--Q3 Show the number of transactions for each model per zip code per state.
+
+SELECT 
+    z.Model_Name, 
+    y.zipCode, 
+    y.state, 
+    COUNT(IDCustomer) AS no_of_trn 
+FROM 
+    FACT_TRANSACTIONS AS X
+INNER JOIN 
+    DIM_LOCATION AS Y ON x.IDLocation = y.IDLocation
+INNER JOIN 
+    DIM_MODEL AS Z ON x.IDModel = z.IDModel
+GROUP BY 
+    z.Model_Name, 
+    y.zipCode, 
+    y.state;
+
+--Q3 End
+
+--Q4 Show the cheapest cellphone (Output should contain the price also) 
+
+SELECT TOP 1 
+    y.Manufacturer_Name, 
+    x.Model_Name, 
+    x.Unit_price 
+FROM 
+    DIM_MODEL AS X
+INNER JOIN 
+    DIM_MANUFACTURER AS Y ON x.IDManufacturer = y.IDManufacturer
+ORDER BY 
+    x.Unit_price ASC;
+
+--Q4 end
+
+
+--Q5 Find out the average price for each model in the top5 manufacturers in terms of sales quantity and order by average price.   
+
+SELECT 
+    v.manufacturer_name, 
+    w.Model_Name, 
+    AVG(w.unit_price) AS Avg_price 
+FROM (
+    SELECT TOP 5 
+        y.IDManufacturer, 
+        z.manufacturer_name, 
+        SUM(x.total_sales) AS Total_REV 
+    FROM (
+        SELECT 
+            IDModel, 
+            SUM(TotalPrice) AS Total_sales 
+        FROM 
+            FACT_TRANSACTIONS 
+        GROUP BY 
+            IDModel
+    ) AS X
+    INNER JOIN DIM_MODEL AS Y ON x.IDModel = y.IDModel
+    INNER JOIN DIM_MANUFACTURER AS Z ON y.IDManufacturer = z.IDManufacturer
+    GROUP BY 
+        y.IDManufacturer, 
+        z.manufacturer_
+
+--Q5 End
+
+--Q6 List the names of the customers and the average amount spent in 2009, where the average is higher than 500 
+
+SELECT 
+    y.Customer_Name, 
+    x.Avg_price, 
+    x.Tran_year 
+FROM (
+    SELECT 
+        x.IDCustomer, 
+        YEAR(date) AS Tran_year, 
+        AVG(totalprice) AS Avg_price 
+    FROM 
+        FACT_TRANSACTIONS AS X
+    WHERE 
+        YEAR(date) = 2009
+    GROUP BY 
+        x.IDCustomer, 
+        YEAR(date)
+    HAVING 
+        AVG(totalprice) > 500
+) AS X
+INNER JOIN DIM_CUSTOMER AS Y ON x.IDCustomer = y.IDCustomer;
+
+--Q6 End
+
+--Q7 List if there is any model that was in the top 5 in terms of quantity, simultaneously in 2008, 2009 and 2010  
+
+WITH Year2008 AS (
+    SELECT TOP 5 
+        IDModel, 
+        SUM(quantity) AS Total_quantity 
+    FROM 
+        FACT_TRANSACTIONS
+    WHERE 
+        YEAR(date) = 2008
+    GROUP BY 
+        IDModel
+    ORDER BY 
+        Total_quantity DESC
+),
+
+Year2009 AS (
+    SELECT TOP 5 
+        IDModel, 
+        SUM(quantity) AS Total_quantity 
+    FROM 
+        FACT_TRANSACTIONS
+    WHERE 
+        YEAR(date) = 2009
+    GROUP BY 
+        IDModel
+    ORDER BY 
+        Total_quantity DESC
+),
+
+Year2010 AS (
+    SELECT TOP 5 
+        IDModel, 
+        SUM(quantity) AS Total_quantity 
+    FROM 
+        FACT_TRANSACTIONS
+    WHERE 
+        YEAR(date) = 2010
+    GROUP BY 
+        IDModel
+    ORDER BY 
+        Total_quantity DESC
+)
+
+SELECT 
+    x.IDModel, 
+    q.Model_Name 
+FROM 
+    Year2008 AS X
+INNER JOIN 
+    Year2009 AS Y ON x.IDModel = y.IDModel
+INNER JOIN 
+    Year2010 AS Z ON y.IDModel = z.IDModel
+INNER JOIN 
+    DIM_MODEL AS Q ON q.IDModel = x.IDModel;
+
+--Q7 End
+
+--Q8 Show the manufacturer with the 2nd top sales in the year of 2009 and the manufacturer with the 2nd top sales in the year of 2010.
+SELECT * FROM (
+    SELECT 
+        z.Manufacturer_Name, 
+        SUM(totalprice) AS Total_sales, 
+        YEAR(x.date) AS Sales_year 
+    FROM 
+        FACT_TRANSACTIONS AS X
+    INNER JOIN 
+        DIM_MODEL AS Y ON x.IDModel = y.IDModel
+    INNER JOIN 
+        DIM_MANUFACTURER AS Z ON y.IDManufacturer = z.IDManufacturer
+    WHERE 
+        YEAR(x.Date) = 2009
+    GROUP BY 
+        z.Manufacturer_Name, YEAR(x.date)
+    ORDER BY 
+        Total_sales DESC
+    OFFSET 1 ROWS FETCH NEXT 1 ROWS ONLY
+) AS X
+UNION
+SELECT * FROM (
+    SELECT 
+        z.Manufacturer_Name, 
+        SUM(totalprice) AS Total_sales, 
+        YEAR(x.date) AS Sales_year 
+    FROM 
+        FACT_TRANSACTIONS AS X
+    INNER JOIN 
+        DIM_MODEL AS Y ON x.IDModel = y.IDModel
+    INNER JOIN 
+        DIM_MANUFACTURER AS Z ON y.IDManufacturer = z.IDManufacturer
+    WHERE 
+        YEAR(x.Date) = 2010
+    GROUP BY 
+        z.Manufacturer_Name, YEAR(x.date)
+    ORDER BY 
+        Total_sales DESC
+    OFFSET 1 ROWS FETCH NEXT 1 ROWS ONLY
+) AS Y;
+
+--Q8 end
+
+--Q9 Show the manufacturers that sold cellphones in 2010 but did not in 2009.   
+
+SELECT z.Manufacturer_Name 
+FROM FACT_TRANSACTIONS AS X
+INNER JOIN DIM_MODEL AS Y ON x.IDModel = y.IDModel
+INNER JOIN DIM_MANUFACTURER AS Z ON y.IDManufacturer = z.IDManufacturer
+WHERE YEAR(x.Date) = 2010
+
+EXCEPT
+
+SELECT z.Manufacturer_Name 
+FROM FACT_TRANSACTIONS AS X
+INNER JOIN DIM_MODEL AS Y ON x.IDModel = y.IDModel
+INNER JOIN DIM_MANUFACTURER AS Z ON y.IDManufacturer = z.IDManufacturer
+WHERE YEAR(x.Date) = 2009;
+
+--Q9 End
+
+--Q10 Find top 100 customers and their average spend, average quantity by each year. Also find the percentage of change in their spend.  
+
+WITH Result AS (
+    SELECT 
+        x.IDCustomer, 
+        YEAR(y.Date) AS Sale_Year, 
+        AVG(y.TotalPrice) AS Avg_Spend, 
+        AVG(y.Quantity) AS Avg_Qty, 
+        SUM(y.TotalPrice) AS Total_Spend,
+        LAG(SUM(y.TotalPrice)) OVER (PARTITION BY x.IDCustomer ORDER BY YEAR(y.Date)) AS Amt_Change
+    FROM (
+        SELECT TOP 10 
+            IDCustomer,  
+            SUM(TotalPrice) AS Total_Sales, 
+            SUM(Quantity) AS Total_Qnt
+        FROM FACT_TRANSACTIONS
+        GROUP BY IDCustomer
+        ORDER BY Total_Sales DESC, Total_Qnt DESC
+    ) AS X
+    INNER JOIN FACT_TRANSACTIONS AS Y ON X.IDCustomer = Y.IDCustomer
+    GROUP BY YEAR(y.Date), x.IDCustomer 
+)
+
+SELECT 
+    Result.IDCustomer, 
+    Sale_Year, 
+    Avg_Spend, 
+    Avg_Qty, 
+    Total_Spend,
+    CASE 
+        WHEN Amt_Change IS NULL THEN NULL
+        ELSE ((Total_Spend - Amt_Change) / Total_Spend) * 100
+    END AS Perc_Change_Spend
+FROM Result;
+
+--Q10 end
+
